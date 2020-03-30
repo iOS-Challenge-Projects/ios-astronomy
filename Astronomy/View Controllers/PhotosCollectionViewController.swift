@@ -66,41 +66,42 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
         
         let photoReference = photoReferences[indexPath.item]
         
-        // TODO: Implement image loading here
-        guard let imageURL = photoReference.imageURL.usingHTTPS else {
-            NSLog("Image URL is not using HTTPS")
-            return
-        }
-        
-        
+        //If the image exist in the cache then set it to the imageView
         if let image = cache.value(for: photoReference.id) {
             cell.imageView.image = image
-            //print("Fetching images: Cache")
+ 
         }else{
-            //print("Fetching images: URLSession")
-            //Fetch the images to be display
-            URLSession.shared.dataTask(with: imageURL) { (data,response,error) in
-                if let error = error {
-                    NSLog("Error Getting image \(error)")
-                    return
-                }
-                
-                guard let data = data else { return }
-                
-                
-                guard let image = UIImage(data: data) else {return}
-                
+            
+            
+          
+            let fetchData = FetchPhotoOperation(marsPhotoReference: photoReference)
+            
+            //convert data to UIImage
+            guard let image = UIImage(data: fetchData.imageData!) else {return}
+            
+           
+            let cacheOperation = BlockOperation {
                 //save in cache for later use
                 self.cache.cache(for: photoReference.id, value: image)
-                
-                DispatchQueue.main.async {
-                    //Check to see if the current index path for cell is the same one we were asked to load. (if not cell is out of view)
-                    if self.collectionView.visibleCells.contains(cell) {
-                        
-                        cell.imageView.image = image
-                    }
+            }
+            
+            let completion = BlockOperation {
+                //if cell still in view
+                if self.collectionView.visibleCells.contains(cell) {
+                    
+                    cell.imageView.image = image
                 }
-            }.resume()
+            }
+            
+            //add operations to the queue
+            photoFetchQueue.addOperations([cacheOperation, completion], waitUntilFinished: false)
+            
+            //Both depend on completion of the fetch operation.
+            cacheOperation.addDependency(fetchData)
+            completion.addDependency(fetchData)
+        
+            //UIKit API and must run on the main queue
+            OperationQueue.main.addOperation(completion)
         }
     }
     
@@ -108,6 +109,8 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
     private let cache = Cache<Int, UIImage>()
     
     private let client = MarsRoverClient()
+    
+    private var photoFetchQueue = OperationQueue()
     
     private var roverInfo: MarsRover? {
         didSet {
@@ -133,3 +136,4 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
     
     @IBOutlet var collectionView: UICollectionView!
 }
+

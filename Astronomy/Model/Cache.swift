@@ -15,14 +15,17 @@ class Cache<Key: Hashable,Value> {
     //Initializing a diccionary
     private var items: [Key:Value] = [:]
     
+    private var queue = DispatchQueue(label: "Cache access management queue")
+    
     func cache(for key: Key, value: Value) {
-        items[key] = value
+        queue.async {
+            self.items[key] = value
+        }
     }
     
     func value(for key: Key) -> Value? {
-        
-        return  items[key]
+       return queue.sync {
+            items[key]
+        }
     }
-    
-    
 }
