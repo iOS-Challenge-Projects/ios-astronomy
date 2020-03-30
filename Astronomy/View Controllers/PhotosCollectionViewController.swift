@@ -64,7 +64,7 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
     
     private func loadImage(forCell cell: ImageCollectionViewCell, forItemAt indexPath: IndexPath) {
         
-         let photoReference = photoReferences[indexPath.item]
+        let photoReference = photoReferences[indexPath.item]
         
         // TODO: Implement image loading here
         guard let imageURL = photoReference.imageURL.usingHTTPS else {
@@ -72,29 +72,40 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
             return
         }
         
-       
         
-        URLSession.shared.dataTask(with: imageURL) { (data,response,error) in
-            if let error = error {
-                NSLog("Error Getting image \(error)")
-                return
-            }
-            
-            guard let data = data else { return }
-            
-            let image = UIImage(data: data)
-            
-            DispatchQueue.main.async {
-                //Check to see if the current index path for cell is the same one we were asked to load. (if not cell is out of view)
-                if self.collectionView.visibleCells.contains(cell) {
-                    
-                    cell.imageView.image = image
+        if let image = cache.value(for: photoReference.id) {
+            cell.imageView.image = image
+            //print("Fetching images: Cache")
+        }else{
+            //print("Fetching images: URLSession")
+            //Fetch the images to be display
+            URLSession.shared.dataTask(with: imageURL) { (data,response,error) in
+                if let error = error {
+                    NSLog("Error Getting image \(error)")
+                    return
                 }
-            }
-        }.resume()
+                
+                guard let data = data else { return }
+                
+                
+                guard let image = UIImage(data: data) else {return}
+                
+                //save in cache for later use
+                self.cache.cache(for: photoReference.id, value: image)
+                
+                DispatchQueue.main.async {
+                    //Check to see if the current index path for cell is the same one we were asked to load. (if not cell is out of view)
+                    if self.collectionView.visibleCells.contains(cell) {
+                        
+                        cell.imageView.image = image
+                    }
+                }
+            }.resume()
+        }
     }
     
     // Properties
+    private let cache = Cache<Int, UIImage>()
     
     private let client = MarsRoverClient()
     
