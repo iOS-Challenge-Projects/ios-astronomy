@@ -28,7 +28,7 @@ class FetchPhotoOperation: ConcurrentOperation {
             return
         }
         
-       task = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
+       task = URLSession.shared.dataTask(with: url) { (data, _, error) in
             
             if let error = error {
                 NSLog("Error loading image data: \(error)")
@@ -37,10 +37,12 @@ class FetchPhotoOperation: ConcurrentOperation {
             
             //Data to be use
             self.imageData = data
-            
+            print("Save image data after fetch")
+        
+
             self.state = .isFinished
-            
-            })
+
+            }
         
         task?.resume()
     }
@@ -48,8 +50,4 @@ class FetchPhotoOperation: ConcurrentOperation {
     override func cancel() {
         task?.cancel()
     }
-    
-    
-    
-    
 }

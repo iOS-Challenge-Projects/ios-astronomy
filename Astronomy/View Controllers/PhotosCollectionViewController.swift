@@ -66,26 +66,45 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
         
         let photoReference = photoReferences[indexPath.item]
         
+        //store fetch operations by the associated photo reference id
+        var fetchOperations: [Int:FetchPhotoOperation] = [:]
+    
+        
+        
+        
         //If the image exist in the cache then set it to the imageView
         if let image = cache.value(for: photoReference.id) {
+            print("Image from Cache")
             cell.imageView.image = image
  
         }else{
+       
+            print("Image from Fetch")
             
-            
-          
+            //Main Operation
             let fetchData = FetchPhotoOperation(marsPhotoReference: photoReference)
-            
-            //convert data to UIImage
-            guard let image = UIImage(data: fetchData.imageData!) else {return}
-            
+            //Add the fetch operation to your dictionary
+            fetchOperations[photoReference.id] = fetchData
            
+            //1st Operation
             let cacheOperation = BlockOperation {
+                print("Save to cache")
+                //convert data to UIImage
+                guard let imageData = fetchData.imageData, let image = UIImage(data: imageData) else {
+                    NSLog("Cound not convert data to UIImage")
+                    return
+                }
                 //save in cache for later use
                 self.cache.cache(for: photoReference.id, value: image)
             }
             
+            //2nd Operation
             let completion = BlockOperation {
+                print("Set image to cell")
+                guard let imageData = fetchData.imageData,let image = UIImage(data: imageData) else {
+                              NSLog("Cound not convert data to UIImage")
+                              return
+                          }
                 //if cell still in view
                 if self.collectionView.visibleCells.contains(cell) {
                     
@@ -93,13 +112,14 @@ class PhotosCollectionViewController: UIViewController, UICollectionViewDataSour
                 }
             }
             
+           //Both depend on completion of the fetch operation.
+           cacheOperation.addDependency(fetchData)
+           completion.addDependency(fetchData)
+
             //add operations to the queue
-            photoFetchQueue.addOperations([cacheOperation, completion], waitUntilFinished: false)
+            photoFetchQueue.addOperations([cacheOperation, fetchData], waitUntilFinished: false)
             
-            //Both depend on completion of the fetch operation.
-            cacheOperation.addDependency(fetchData)
-            completion.addDependency(fetchData)
-        
+            
             //UIKit API and must run on the main queue
             OperationQueue.main.addOperation(completion)
         }
